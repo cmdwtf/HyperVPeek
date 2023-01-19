@@ -1,4 +1,6 @@
+using CommunityToolkit.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 using Microsoft.Management.Infrastructure;
 
@@ -7,12 +9,14 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.IO;
 using System.IO.IsolatedStorage;
 using System.Security;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+
+using Xceed.Wpf.Toolkit;
 
 namespace HyperVPeek
 {
@@ -48,6 +52,18 @@ namespace HyperVPeek
 		private bool _exceededMaxEnvelopeSize = false;
 		[ObservableProperty]
 		private ObservableCollection<string> _virtualMachines = new();
+		[ObservableProperty]
+		private BitmapSource? _lastVirtualMachineImage;
+
+		[ObservableProperty]
+		private string _selectedVirtualMachine = string.Empty;
+
+		[ObservableProperty]
+		private double _virtualMachinePreviewWidth = 0d;
+		[ObservableProperty]
+		private double _virtualMachinePreviewHeight = 0d;
+		[ObservableProperty]
+		private Transform _virtualMachineRenderTransform = Transform.Identity;
 
 		private readonly RemoteHyperVModel _model = new();
 
@@ -62,31 +78,42 @@ namespace HyperVPeek
 			DefaultValueHandling = DefaultValueHandling.Include
 		};
 
-		public bool Connect(SecureString password)
+		private static readonly IsolatedStorageFile IsoStore =
+			IsolatedStorageFile.GetStore(IsolatedStorageScope.User | IsolatedStorageScope.Assembly, null, null);
+
+		[RelayCommand]
+		private void Connect(WatermarkPasswordBox pwBox)
 		{
 			if (!IsDisconnected)
 			{
-				return false;
+				return;
 			}
 
 			Status = $"Connecting...";
 
-			bool didConnect = _model.Connect(TargetDomain, TargetHostname, Username, password);
+			try
+			{
+				bool didConnect = _model.Connect(TargetDomain, TargetHostname, Username, pwBox.SecurePassword);
 
-			IsConnected = _model.ConnectionState == ConnectionState.Connected;
-			IsDisconnected = _model.ConnectionState == ConnectionState.Disconnected;
-			ExceededMaxEnvelopeSize = false;
+				IsConnected = _model.ConnectionState == ConnectionState.Connected;
+				IsDisconnected = _model.ConnectionState == ConnectionState.Disconnected;
+				ExceededMaxEnvelopeSize = false;
+			}
+			catch (Exception ex)
+			{
+				Status = $"Failed to connect: {ex.Message}";
+				return;
+			}
 
 			Status = $"Connected";
-
-			return didConnect;
 		}
 
-		public bool Disconnect()
+		[RelayCommand]
+		private void Disconnect()
 		{
 			if (!IsConnected)
 			{
-				return false;
+				return;
 			}
 
 			Status = $"Disconnecting...";
@@ -98,11 +125,11 @@ namespace HyperVPeek
 			ExceededMaxEnvelopeSize = false;
 
 			Status = $"Disconnected";
-
-			return didDisconnect;
 		}
 
-		public void UpdateVirtualMachineList()
+
+		[RelayCommand]
+		private void UpdateVirtualMachineList()
 		{
 			Status = $"Getting virtual machine list...";
 
@@ -141,13 +168,42 @@ namespace HyperVPeek
 			return Array.Empty<string>();
 		}
 
+		[RelayCommand]
+		private void RefreshVirtualMachineImage()
+		{
+			if (VirtualMachinePreviewWidth == 0 ||
+				VirtualMachinePreviewHeight == 0)
+			{
+				return;
+			}
+
+			LastVirtualMachineImage = GetVirtualMachinePreview(
+				SelectedVirtualMachine,
+				VirtualMachinePreviewWidth,
+				VirtualMachinePreviewHeight);
+		}
+
 		public BitmapSource? GetVirtualMachinePreview(string systemName, double imageWidth, double imageHeight)
 		{
 			if (!IsConnected)
 			{
-				Status = $"Can't get image for {systemName}, not connected.";
+				Status = $"Can't get image for {systemName}, not connected";
 				return null;
 			}
+
+			if (string.IsNullOrEmpty(systemName))
+			{
+				Status = "Please select a VM";
+				return null;
+			}
+
+			if (!SelectedVirtualMachine.Equals(systemName, StringComparison.InvariantCultureIgnoreCase))
+			{
+				SelectedVirtualMachine = systemName;
+			}
+
+			VirtualMachinePreviewWidth = imageWidth;
+			VirtualMachinePreviewHeight = imageHeight;
 
 			Status = $"Getting image for {systemName}";
 
@@ -192,12 +248,15 @@ namespace HyperVPeek
 			return null;
 		}
 
-		public bool SetMaxEnvelopeSize(uint sizeKilobytes)
+		[RelayCommand]
+		private void SetMaxEnvelopeSize(uint sizeKilobytes)
 		{
+			Guard.IsGreaterThan(sizeKilobytes, 0);
+
 			if (!IsConnected)
 			{
 				Status = $"Can't send SetmaxEnvelopeSize command, not connected";
-				return false;
+				return;
 			}
 
 			ExceededMaxEnvelopeSize = false;
@@ -220,25 +279,19 @@ namespace HyperVPeek
 			{
 				Status = $"Cim Error: {cex.Message}";
 			}
-
-			return sent;
 		}
 
-		private static IsolatedStorageFile GetIsoStore()
-			=> IsolatedStorageFile.GetStore(IsolatedStorageScope.User | IsolatedStorageScope.Assembly, null, null);
-
-		internal void LoadSettings()
+		[RelayCommand]
+		private void LoadSettings()
 		{
-			using IsolatedStorageFile isoStore = GetIsoStore();
-
-			if (!isoStore.FileExists(SettingsFileName))
+			if (!IsoStore.FileExists(SettingsFileName))
 			{
 				return;
 			}
 
 			try
 			{
-				using IsolatedStorageFileStream stream = isoStore.OpenFile(SettingsFileName, FileMode.Open, FileAccess.Read);
+				using IsolatedStorageFileStream stream = IsoStore.OpenFile(SettingsFileName, FileMode.Open, FileAccess.Read);
 				using StreamReader reader = new(stream);
 				using JsonTextReader jsonReader = new(reader);
 				var serializer = JsonSerializer.Create(_jsonSettings);
@@ -250,12 +303,12 @@ namespace HyperVPeek
 			}
 		}
 
-		internal void SaveSettings()
+		[RelayCommand]
+		private void SaveSettings()
 		{
 			try
 			{
-				using IsolatedStorageFile isoStore = GetIsoStore();
-				using IsolatedStorageFileStream stream = isoStore.OpenFile(SettingsFileName, FileMode.Create, FileAccess.Write);
+				using IsolatedStorageFileStream stream = IsoStore.OpenFile(SettingsFileName, FileMode.Create, FileAccess.Write);
 				using StreamWriter writer = new(stream);
 				string serializedSettings = JsonConvert.SerializeObject(this, _jsonSettings);
 				writer.Write(serializedSettings);
@@ -265,5 +318,7 @@ namespace HyperVPeek
 				Status = $"Unable to save settings: {ex.Message}";
 			}
 		}
+
+		partial void OnSelectedVirtualMachineChanged(string value) => RefreshVirtualMachineImage();
 	}
 }

@@ -5,81 +5,100 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HyperVPeek"
         xmlns:tk="clr-namespace:Xceed.Wpf.Toolkit;assembly=DotNetProjects.Wpf.Extended.Toolkit"
-        xmlns:System="clr-namespace:System;assembly=System.Runtime" x:Class="HyperVPeek.MainWindow"
+        xmlns:System="clr-namespace:System;assembly=System.Runtime"
+        xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+        x:Class="HyperVPeek.MainWindow"
         mc:Ignorable="d"
-        Title="Hyper-V Peek" Height="450" Width="800" Loaded="Window_Loaded" Closed="Window_Closed">
-    <Window.Resources>
-        <local:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
-        <Style TargetType="{x:Type Button}" x:Key="VisibleWhenConnected">
-            <Setter Property="Visibility" Value="Collapsed"/>
-            <Style.Triggers>
-                <DataTrigger Value="True" Binding="{Binding IsConnected}">
-                    <Setter Property="Visibility" Value="Visible"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style TargetType="{x:Type Button}" x:Key="VisibleWhenDisconnected">
-            <Setter Property="Visibility" Value="Collapsed"/>
-            <Style.Triggers>
-                <DataTrigger Value="True" Binding="{Binding IsDisconnected}">
-                    <Setter Property="Visibility" Value="Visible"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style TargetType="{x:Type Button}" x:Key="VisibleWhenNoAutoRefresh">
-            <Setter Property="Visibility" Value="Collapsed"/>
-            <Style.Triggers>
-                <DataTrigger Value="False" Binding="{Binding AutoRefresh}">
-                    <Setter Property="Visibility" Value="Visible"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style TargetType="{x:Type Button}" x:Key="VisibleWhenExceededMaxEnvelopeSize">
-            <Setter Property="Visibility" Value="Collapsed"/>
-            <Style.Triggers>
-                <DataTrigger Value="True" Binding="{Binding ExceededMaxEnvelopeSize}">
-                    <Setter Property="Visibility" Value="Visible"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-    </Window.Resources>
-    <Window.DataContext>
-        <local:MainWindowViewModel/>
-    </Window.DataContext>
+        Title="Hyper-V Peek" Height="450" Width="800">
+  <Window.Resources>
+    <local:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+    <Style TargetType="{x:Type Button}" x:Key="VisibleWhenConnected">
+      <Setter Property="Visibility" Value="Collapsed"/>
+      <Style.Triggers>
+        <DataTrigger Value="True" Binding="{Binding IsConnected}">
+          <Setter Property="Visibility" Value="Visible"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style TargetType="{x:Type Button}" x:Key="VisibleWhenDisconnected">
+      <Setter Property="Visibility" Value="Collapsed"/>
+      <Style.Triggers>
+        <DataTrigger Value="True" Binding="{Binding IsDisconnected}">
+          <Setter Property="Visibility" Value="Visible"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style TargetType="{x:Type Button}" x:Key="VisibleWhenNoAutoRefresh">
+      <Setter Property="Visibility" Value="Collapsed"/>
+      <Style.Triggers>
+        <DataTrigger Value="False" Binding="{Binding AutoRefresh}">
+          <Setter Property="Visibility" Value="Visible"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style TargetType="{x:Type Button}" x:Key="VisibleWhenExceededMaxEnvelopeSize">
+      <Setter Property="Visibility" Value="Collapsed"/>
+      <Style.Triggers>
+        <DataTrigger Value="True" Binding="{Binding ExceededMaxEnvelopeSize}">
+          <Setter Property="Visibility" Value="Visible"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </Window.Resources>
+  <Window.DataContext>
+    <local:MainWindowViewModel/>
+  </Window.DataContext>
+  <b:Interaction.Triggers>
+    <b:EventTrigger EventName="Loaded">
+      <b:InvokeCommandAction Command="{Binding LoadSettingsCommand}"/>
+    </b:EventTrigger>
+    <b:EventTrigger EventName="Closed">
+      <b:InvokeCommandAction Command="{Binding SaveSettingsCommand}"/>
+    </b:EventTrigger>
+  </b:Interaction.Triggers>
+  <DockPanel>
+    <StackPanel Orientation="Vertical" DockPanel.Dock="Top">
+      <StackPanel Orientation="Horizontal" Margin="0, 3, 0, 3">
+        <StackPanel Orientation="Horizontal" IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}">
+          <tk:WatermarkTextBox Margin="3,3,3,3" TextWrapping="NoWrap" Width="120" Watermark="Domain Name" Text="{Binding TargetDomain}"/>
+          <tk:WatermarkTextBox Margin="3,3,3,3" TextWrapping="NoWrap" Width="120" Watermark="Hyper-V Hostname" Text="{Binding TargetHostname}"/>
+          <tk:WatermarkTextBox Margin="3,3,3,3" TextWrapping="NoWrap" Width="120" Watermark="Username" Text="{Binding Username}"/>
+          <tk:WatermarkPasswordBox x:Name="PasswordTextBox" Margin="3,3,3,3" TextWrapping="NoWrap" Width="120" Watermark="Password"/>
+        </StackPanel>
+        <Button Content="Connect" Margin="3,3,3,3" Width="80" Style="{Binding Mode=OneWay, Source={StaticResource VisibleWhenDisconnected}}">
+          <b:Interaction.Triggers>
+            <b:EventTrigger EventName="Click">
+              <b:InvokeCommandAction Command="{Binding ConnectCommand}" CommandParameter="{Binding ElementName=PasswordTextBox}"/>
+              <b:InvokeCommandAction Command="{Binding UpdateVirtualMachineListCommand}" />
+            </b:EventTrigger>
+          </b:Interaction.Triggers>
+        </Button>
+        <Button Content="Disconnect" Margin="3,3,3,3" Width="80" Style="{Binding Mode=OneWay, Source={StaticResource VisibleWhenConnected}}" Command="{Binding DisconnectCommand, Mode=OneWay}" />
+        <Button Content="Refresh" Margin="3,3,3,3" Width="80" Style="{Binding Mode=OneWay, Source={StaticResource VisibleWhenNoAutoRefresh}}" Command="{Binding RefreshVirtualMachineImageCommand, Mode=OneWay}"/>
+      </StackPanel>
+    </StackPanel>
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal">
+      <Label Content="{Binding Status}"></Label>
+      <Button Content="Try Making it 2MB" Margin="3,3,3,3" Width="80" Style="{Binding Mode=OneWay, Source={StaticResource VisibleWhenExceededMaxEnvelopeSize}}" Command="{Binding SetMaxEnvelopeSizeCommand, Mode=OneWay}">
+        <Button.CommandParameter>
+          <System:Int32>2048</System:Int32>
+        </Button.CommandParameter>
+      </Button>
+    </StackPanel>
     <DockPanel>
-        <StackPanel Orientation="Vertical" DockPanel.Dock="Top">
-            <StackPanel Orientation="Horizontal" Margin="0, 3, 0, 3">
-                <StackPanel Orientation="Horizontal" IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}">
-                    <tk:WatermarkTextBox Margin="3,3,3,3" TextWrapping="NoWrap" Width="120" Watermark="Domain Name" Text="{Binding TargetDomain}"/>
-                    <tk:WatermarkTextBox Margin="3,3,3,3" TextWrapping="NoWrap" Width="120" Watermark="Hyper-V Hostname" Text="{Binding TargetHostname}"/>
-                    <tk:WatermarkTextBox Margin="3,3,3,3" TextWrapping="NoWrap" Width="120" Watermark="Username" Text="{Binding Username}"/>
-                    <tk:WatermarkPasswordBox x:Name="PasswordTextBox" Margin="3,3,3,3" TextWrapping="NoWrap" Width="120" Watermark="Password"/>
-                </StackPanel>
-                <Button Content="Connect" Margin="3,3,3,3" Width="80" Click="Connect_Click" Style="{Binding Mode=OneWay, Source={StaticResource VisibleWhenDisconnected}}" />
-                <Button Content="Disconnect" Margin="3,3,3,3" Width="80" Click="Disconnect_Click" Style="{Binding Mode=OneWay, Source={StaticResource VisibleWhenConnected}}" />
-                <Button Content="Refresh" Margin="3,3,3,3" Width="80" Click="Refresh_Click" Style="{Binding Mode=OneWay, Source={StaticResource VisibleWhenNoAutoRefresh}}"/>
-            </StackPanel>
-        </StackPanel>
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal">
-            <Label Content="{Binding Status}"></Label>
-            <Button Content="Try Making it 2MB" Margin="3,3,3,3" Width="80" Style="{Binding Mode=OneWay, Source={StaticResource VisibleWhenExceededMaxEnvelopeSize}}" Click="EnlargeMaxEnvelopeSize_Click" />
-        </StackPanel>
-        <DockPanel>
-            <Grid Width="100
-                  " IsEnabled="{Binding IsConnected}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Label Content="VMs"></Label>
-                <ListBox Margin="3,3,3,3" Grid.Row="1" SelectionChanged="ListBox_SelectionChanged" ItemsSource="{Binding VirtualMachines}"/>
-                <CheckBox Content="Auto-Refresh" Grid.Row="2" IsChecked="{Binding AutoRefresh}"></CheckBox>
-            </Grid>
-            <StackPanel DockPanel.Dock="Right" x:Name="VmImagePanel" Margin="3,3,3,3">
-                <Image x:Name="VmImage" Stretch="Fill" />
-            </StackPanel>
-        </DockPanel>
+      <Grid Width="100" IsEnabled="{Binding IsConnected}">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Label Content="VMs"></Label>
+        <ListBox Margin="3,3,3,3" Grid.Row="1" ItemsSource="{Binding VirtualMachines}" SelectedValue="{Binding SelectedVirtualMachine}"/>
+        <CheckBox Content="Auto-Refresh" Grid.Row="2" IsChecked="{Binding AutoRefresh}"></CheckBox>
+      </Grid>
+      <StackPanel DockPanel.Dock="Right" x:Name="VmImagePanel" Margin="3,3,3,3" SizeChanged="VmImagePanel_SizeChanged">
+        <Image x:Name="VmImage" Stretch="Fill" Source="{Binding LastVirtualMachineImage}" />
+      </StackPanel>
     </DockPanel>
+  </DockPanel>
 </Window>
