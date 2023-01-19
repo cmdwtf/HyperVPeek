@@ -49,7 +49,7 @@ namespace HyperVPeek
 
 		private void Window_Loaded(object sender, RoutedEventArgs e) => _viewModel.LoadSettings();
 
-		private void Window_Closing(object sender, CancelEventArgs e) => _viewModel.SaveSettings();
+		private void Window_Closed(object sender, EventArgs e) => _viewModel.SaveSettings();
 
 		private void Timer_Tick(object? sender, EventArgs e) => UpdateVirtualSystemImage();
 
