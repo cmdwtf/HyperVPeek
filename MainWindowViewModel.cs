@@ -1,3 +1,5 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 using Microsoft.Management.Infrastructure;
 
 using Newtonsoft.Json;
@@ -15,28 +17,37 @@ using System.Windows.Media.Imaging;
 namespace HyperVPeek
 {
 	[JsonObject(MemberSerialization = MemberSerialization.OptIn)]
-	public partial class MainWindowViewModel : INotifyPropertyChanged
+	public partial class MainWindowViewModel : ObservableObject
 	{
 		#region Settings
 
-		[JsonProperty]
-		public string TargetHostname { get; set; } = string.Empty;
-		[JsonProperty]
-		public string TargetDomain { get; set; } = string.Empty;
-		[JsonProperty]
-		public string Username { get; set; } = string.Empty;
-		[JsonProperty]
-		public bool AutoRefresh { get; set; } = true;
+		[ObservableProperty]
+		[property: JsonProperty]
+		private string _targetHostname = string.Empty;
+		[ObservableProperty]
+		[property: JsonProperty]
+		private string _targetDomain = string.Empty;
+		[ObservableProperty]
+		[property: JsonProperty]
+		private string _username = string.Empty;
+		[ObservableProperty]
+		[property: JsonProperty]
+		private bool _autoRefresh = true;
 
 		#endregion Settings
 
 		#region State
 
-		public string Status { get; set; } = "Disconnected";
-		public bool IsDisconnected { get; private set; } = true;
-		public bool IsConnected { get; private set; }
-		public bool ExceededMaxEnvelopeSize { get; private set; } = false;
-		public ObservableCollection<string> VirtualMachines { get; } = new();
+		[ObservableProperty]
+		private string _status = "Disconnected";
+		[ObservableProperty]
+		private bool _isDisconnected = true;
+		[ObservableProperty]
+		private bool _isConnected = false;
+		[ObservableProperty]
+		private bool _exceededMaxEnvelopeSize = false;
+		[ObservableProperty]
+		private ObservableCollection<string> _virtualMachines = new();
 
 		private readonly RemoteHyperVModel _model = new();
 
@@ -246,7 +257,8 @@ namespace HyperVPeek
 				using IsolatedStorageFile isoStore = GetIsoStore();
 				using IsolatedStorageFileStream stream = isoStore.OpenFile(SettingsFileName, FileMode.Create, FileAccess.Write);
 				using StreamWriter writer = new(stream);
-				writer.Write(JsonConvert.SerializeObject(this, _jsonSettings));
+				string serializedSettings = JsonConvert.SerializeObject(this, _jsonSettings);
+				writer.Write(serializedSettings);
 			}
 			catch (Exception ex)
 			{
